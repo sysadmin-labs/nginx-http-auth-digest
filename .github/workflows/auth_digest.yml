@@ -1,0 +1,39 @@
+name: Digest auth
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    # Monday morning, so a new nginx release that breaks the module shows
+    # up here and not in somebody's build
+    - cron: '41 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  auth_digest:
+    name: exercise the digest handshake
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The suite in t/ computes one digest response and checks the challenge;
+    # this runs the methods end to end with curl, which does the full two
+    # round-trip handshake, and covers a correct login, a wrong password and
+    # the brute-force evasion lockout.
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup
+        with:
+          test-nginx: 'false'
+
+      - name: Build nginx
+        run: |
+          . .github/versions.env
+          ci/build.sh "$NGINX_VERSION" "$HOME/nginx"
+
+      - name: Drive the digest handshake
+        run: ci/auth_digest.sh "$HOME/nginx/sbin/nginx"

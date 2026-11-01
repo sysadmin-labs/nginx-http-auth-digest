@@ -1,0 +1,8 @@
+ngx_addon_name=ngx_http_auth_digest_module
+
+ngx_module_type=HTTP
+ngx_module_name=ngx_http_auth_digest_module
+ngx_module_srcs="$ngx_addon_dir/src/ngx_http_auth_digest_module.c"
+ngx_module_deps="$ngx_addon_dir/src/ngx_http_auth_digest_module.h"
+
+. auto/module
