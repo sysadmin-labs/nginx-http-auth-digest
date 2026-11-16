@@ -879,10 +879,20 @@ static ngx_int_t ngx_http_auth_digest_send_challenge(ngx_http_request_t *r,
   p = ngx_cpymem(p, "\", nonce=\"", sizeof("\", nonce=\"") - 1);
   p = ngx_sprintf(p, "%08xl%08xl", nonce.rnd, nonce.t);
 
+  /*
+   * sizeof() - 1, not sizeof(): the terminator is not part of a header
+   * value, and challenge.len above does not account for it, so copying it
+   * wrote one byte past the allocation.  Every unauthenticated request to
+   * a protected location did that, which makes it reachable by anyone --
+   * and it was invisible to the sanitizers, because the allocation comes
+   * from the request pool and the allocator sees that block as one piece.
+   * The sanitizer workflow builds with -DNGX_DEBUG_PALLOC=1 now, which is
+   * what brought it out.
+   */
   if (is_stale) {
-    p = ngx_cpymem(p, "\", stale=\"true\"", sizeof("\", stale=\"true\""));
+    p = ngx_cpymem(p, "\", stale=\"true\"", sizeof("\", stale=\"true\"") - 1);
   } else {
-    p = ngx_cpymem(p, "\"", sizeof("\""));
+    *p++ = '"';
   }
   r->headers_out.www_authenticate->value = challenge;
 

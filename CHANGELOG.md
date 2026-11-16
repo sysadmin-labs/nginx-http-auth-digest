@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.0.2 (2026-11-16)
+
+### Fixed
+
+- **A one-byte heap overflow on every unauthenticated request.**
+  `ngx_http_auth_digest_send_challenge` sizes the `WWW-Authenticate`
+  value, allocates exactly that much, and then filled it with two
+  `ngx_cpymem` calls that used `sizeof(...)` instead of
+  `sizeof(...) - 1`: the terminator came along, and `challenge.len` does
+  not account for one. Measured at run time with a realm of fifteen
+  characters: eighty-five bytes allocated, eighty-six written, in both
+  the stale and the ordinary branch.
+
+  Any request to a protected location reaches it, so anyone can, and it
+  needs no credentials. What it corrupts is whatever the request pool
+  handed out next.
+
+  It had been invisible to the sanitizer workflow, because the allocation
+  comes from the request pool: `ngx_pnalloc` hands out a slice of a block
+  that the allocator sees as one piece, and a write just past the slice
+  lands inside memory ASan had handed over whole. Building with
+  `-DNGX_DEBUG_PALLOC=1`, which sends every allocation straight to
+  malloc, is what brought it out -- ASan then reports
+  `heap-buffer-overflow ... 0 bytes after 85-byte region` and takes the
+  worker down with it, on the first request.
+
 ## 1.0.1 (2026-11-01)
 
 Taken over as a maintained fork of atomx/nginx-http-auth-digest, itself a
