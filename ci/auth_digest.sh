@@ -134,12 +134,17 @@ else
 	sleep 1
 fi
 
+# Every command in here has to tolerate failing.  Under set -e the shell
+# leaves the function at the first non-zero status and never reaches the
+# return below: kill(1) reports 1 once the process is already gone, and
+# wait(1) hands back valgrind's --error-exitcode, so a finding used to end
+# the script right here, before the log was read and with nothing printed.
 stop() {
 	if [ -n "$ngxpid" ]; then
-		kill -QUIT "$ngxpid" 2>/dev/null
-		wait "$ngxpid" 2>/dev/null
+		kill -QUIT "$ngxpid" 2>/dev/null || :
+		wait "$ngxpid" 2>/dev/null || :
 	elif [ -s "$WORK/logs/nginx.pid" ]; then
-		kill -QUIT "$(cat "$WORK/logs/nginx.pid")" 2>/dev/null
+		kill -QUIT "$(cat "$WORK/logs/nginx.pid")" 2>/dev/null || :
 	fi
 	return 0
 }
@@ -204,7 +209,9 @@ if [ -n "$VG" ]; then
 	indl=$(sed -n 's/.*indirectly lost: \([0-9,]*\) bytes.*/\1/p' "$vglog" | tr -d , | tail -1)
 	if [ "${errs:-0}" != 0 ] || [ "${defl:-0}" != 0 ] || [ "${indl:-0}" != 0 ]; then
 		note "valgrind: ${errs:-?} errors, definitely lost ${defl:-?}, indirectly lost ${indl:-?}"
-		grep -niE "Invalid read|Invalid write|uninitialised|Mismatched free" "$vglog" >&2
+		# the whole log, because a leak carries its trace nowhere else and
+		# a byte count on its own is nothing anybody can act on
+		sed "s/^/    /" "$vglog" >&2
 	else
 		echo "  clean (errors $errs, suppressed shown in log)"
 	fi

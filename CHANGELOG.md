@@ -4,6 +4,15 @@
 
 ### Fixed
 
+- A valgrind finding is now reported instead of ending the run in
+  silence.  `stop` runs `kill` and `wait`, and under `set -e` the shell
+  leaves the function at the first non-zero status, never reaching its
+  `return 0`: `kill` reports 1 once the process is gone and `wait` hands
+  back valgrind's `--error-exitcode`.  The script therefore died right
+  after printing `== valgrind`, before reading the log, and the job
+  failed without saying why.  A finding now also prints the log itself,
+  because a leak carries its trace nowhere else.
+
 - CI: the Test::Nginx cache is now keyed by the Perl build, not just by
   the runner OS.  When the hosted image moved to Ubuntu 26.04 the cached
   `~/perl5` tree was restored against a new interpreter and every test
